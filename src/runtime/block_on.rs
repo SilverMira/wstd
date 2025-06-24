@@ -32,6 +32,7 @@ where
     // Either the future completes and we return, or some IO is happening
     // and we wait.
     let res = loop {
+        reactor.poll_queue();
         match fut.as_mut().poll(&mut cx) {
             Poll::Ready(res) => break res,
             Poll::Pending => {

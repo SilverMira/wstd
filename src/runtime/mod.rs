@@ -13,8 +13,9 @@
 mod block_on;
 mod reactor;
 
+pub use async_task::{FallibleTask, Task};
 pub use block_on::block_on;
-pub use reactor::{AsyncPollable, Reactor, WaitFor};
+pub use reactor::{spawn, AsyncPollable, Reactor, WaitFor};
 use std::cell::RefCell;
 
 // There are no threads in WASI 0.2, so this is just a safe way to thread a single reactor to all

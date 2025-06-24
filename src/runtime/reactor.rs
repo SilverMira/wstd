@@ -104,6 +104,8 @@ struct InnerReactor {
     pollables: Slab<Pollable>,
     wakers: HashMap<Waitee, Waker>,
     immediate: LazyCell<(Pollable, Waker)>,
+    task_queue: flume::Receiver<async_task::Runnable>,
+    task_schedule: flume::Sender<async_task::Runnable>,
 }
 
 impl Reactor {
@@ -122,6 +124,7 @@ impl Reactor {
 
     /// Create a new instance of `Reactor`
     pub(crate) fn new() -> Self {
+        let (task_schedule, task_queue) = flume::unbounded();
         Self {
             inner: Rc::new(RefCell::new(InnerReactor {
                 pollables: Slab::new(),
@@ -132,6 +135,8 @@ impl Reactor {
                         noop_waker(),
                     )
                 }),
+                task_queue,
+                task_schedule,
             })),
         }
     }
@@ -236,6 +241,38 @@ impl Reactor {
         }
         ready
     }
+
+    pub(crate) fn poll_queue(&self) {
+        loop {
+            let awake_tasks = {
+                let inner = self.inner.borrow();
+                if inner.task_queue.is_empty() {
+                    break;
+                }
+                inner.task_queue.drain().collect::<Vec<_>>()
+            };
+            for task in awake_tasks.into_iter() {
+                task.run();
+            }
+        }
+    }
+}
+
+/// Spawn a future onto the reactor
+pub fn spawn<F: std::future::Future + 'static>(
+    future: F,
+) -> async_task::Task<<F as std::future::Future>::Output> {
+    let schedule_tx = Reactor::current().inner.borrow().task_schedule.downgrade();
+    let schedule = move |task: async_task::Runnable| {
+        let Some(schedule_tx) = schedule_tx.upgrade() else {
+            // The reactor has been dropped, so we can't schedule any more tasks.
+            return;
+        };
+        schedule_tx.send(task).unwrap();
+    };
+    let (runnable, task) = async_task::spawn_local(future, schedule);
+    runnable.schedule();
+    task
 }
 
 /// Construct a new no-op waker

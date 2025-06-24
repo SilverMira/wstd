@@ -23,6 +23,8 @@ pin-project-lite.workspace = true
 slab.workspace = true
 wasi.workspace = true
 wstd-macro.workspace = true
+async-task.workspace = true
+flume.workspace = true
 
 # optional
 serde = { workspace = true, optional = true }
@@ -83,6 +85,8 @@ wasmtime-wasi = "26"
 wasmtime-wasi-http = "26"
 wstd = { path = "." }
 wstd-macro = { path = "macro", version = "=0.5.3" }
+async-task = "4.7.1"
+flume = { version = "0.11.1", default-features = false }
 
 [package.metadata.docs.rs]
 all-features = true
