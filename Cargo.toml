@@ -37,6 +37,7 @@ futures-lite.workspace = true
 humantime.workspace = true
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+flume = { workspace = true, features = ["async"] }
 
 [workspace]
 members = [

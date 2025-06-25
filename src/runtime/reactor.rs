@@ -157,8 +157,9 @@ impl Reactor {
     /// to make progress. If it is, we will just poll all pollables without blocking
     /// by including an always ready pollable, or choose to skip calling poll at all
     /// if no pollables are registered.
-    pub(crate) fn block_until(&self, awake: bool) {
+    pub(crate) fn block_until(&self, mut awake: bool) {
         let reactor = self.inner.borrow();
+        awake |= !reactor.task_queue.is_empty();
 
         // If no tasks are interested in any pollables currently, and the main task
         // is already awake, run the next poll loop instead
@@ -243,17 +244,15 @@ impl Reactor {
     }
 
     pub(crate) fn poll_queue(&self) {
-        loop {
-            let awake_tasks = {
-                let inner = self.inner.borrow();
-                if inner.task_queue.is_empty() {
-                    break;
-                }
-                inner.task_queue.drain().collect::<Vec<_>>()
-            };
-            for task in awake_tasks.into_iter() {
-                task.run();
+        let awake_tasks = {
+            let inner = self.inner.borrow();
+            if inner.task_queue.is_empty() {
+                return;
             }
+            inner.task_queue.drain().collect::<Vec<_>>()
+        };
+        for task in awake_tasks.into_iter() {
+            task.run();
         }
     }
 }
@@ -390,5 +389,22 @@ mod test {
             let soon = reactor.schedule(soon);
             soon.wait_for().await;
         })
+    }
+
+    #[test]
+    fn spawned_tasks_are_run() {
+        crate::runtime::block_on(async {
+            let reactor = Reactor::current();
+            let (tx, rx) = flume::bounded(1);
+            crate::runtime::spawn(async move {
+                let soon = wasi::clocks::monotonic_clock::subscribe_duration(10_000_000);
+                let soon = reactor.schedule(soon);
+                soon.wait_for().await;
+                tx.send(()).unwrap();
+            })
+            .detach();
+
+            let _ = rx.recv_async().await;
+        });
     }
 }

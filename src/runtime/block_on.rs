@@ -33,13 +33,15 @@ where
     // and we wait.
     let res = loop {
         reactor.poll_queue();
-        match fut.as_mut().poll(&mut cx) {
-            Poll::Ready(res) => break res,
-            Poll::Pending => {
-                reactor.block_until(waker_impl.awake());
-                waker_impl.set_awake(false);
+
+        if waker_impl.awake() {
+            waker_impl.set_awake(false);
+            match fut.as_mut().poll(&mut cx) {
+                Poll::Ready(res) => break res,
+                Poll::Pending => {}
             }
         }
+        reactor.block_until(waker_impl.awake());
     };
     // Clear the singleton
     REACTOR.replace(None);
@@ -53,7 +55,7 @@ struct ReactorWaker {
 impl ReactorWaker {
     fn new() -> Self {
         Self {
-            awake: AtomicBool::new(false),
+            awake: AtomicBool::new(true),
         }
     }
 
