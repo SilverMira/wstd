@@ -255,6 +255,18 @@ impl Reactor {
             task.run();
         }
     }
+
+    pub(crate) fn drop_tasks(&self) {
+        loop {
+            let _awake_tasks = {
+                let inner = self.inner.borrow();
+                if inner.task_queue.is_empty() {
+                    return;
+                }
+                inner.task_queue.drain().collect::<Vec<_>>()
+            };
+        }
+    }
 }
 
 /// Spawn a future onto the reactor

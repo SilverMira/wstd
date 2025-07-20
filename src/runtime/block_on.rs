@@ -43,6 +43,7 @@ where
         }
         reactor.block_until(waker_impl.awake());
     };
+    reactor.drop_tasks();
     // Clear the singleton
     REACTOR.replace(None);
     res
